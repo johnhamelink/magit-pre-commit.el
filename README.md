@@ -1,8 +1,6 @@
 # magit-pre-commit.el
 
-[Pre-commit](https://pre-commit.com/) integration for Magit.
-
-Press `@` from any magit buffer to access pre-commit commands.
+Integrate [pre-commit](https://pre-commit.com/) into Magit. Press `@` from any magit buffer to open the pre-commit menu.
 
 ## Installation
 
