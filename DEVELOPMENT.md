@@ -1,34 +1,41 @@
 # Development Guide
 
-This guide is for Doom Emacs. Please refer to the [MELPA contributing guidelines](https://github.com/melpa/melpa/blob/master/CONTRIBUTING.org) for more information.
+This guide is for [Doom Emacs](https://github.com/doomemacs/doomemacs) users.
+
+Please make sure this package continues to meet the [MELPA contributing guidelines](https://github.com/melpa/melpa/blob/master/CONTRIBUTING.org).
 
 ## Local Installation
 
-In your `packages.el`:
+Add the following to your `packages.el`:
 
 ```elisp
 (package! magit-pre-commit
-  :recipe (:local-repo "/path/to/magit-pre-commit.el" :build (:not compile)))
+  :recipe (:local-repo "/path/to/magit-pre-commit.el"
+           :build (:not compile)))
 ```
 
-Then run `doom sync`.
+Then run `doom sync` to install.
 
 ## Reloading Changes
 
 ### If autoloads change
 
-If you add or modify `;;;###autoload` cookies:
+Run:
 
-```
-M-x doom/reload
+```elisp
+(doom/reload)
 ```
 
 ### For other changes
 
-For most changes, you can simply reload the library:
+Use one of:
 
-```
-M-x load-library RET magit-pre-commit RET
+```elisp
+(load-library "magit-pre-commit")  ; Reload the entire library
 ```
 
-Or evaluate the buffer directly with `M-x eval-buffer` when viewing `magit-pre-commit.el`.
+or
+
+```elisp
+(eval-buffer)  ; Evaluate the current buffer (when editing magit-pre-commit.el)
+```

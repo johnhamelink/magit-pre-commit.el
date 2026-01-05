@@ -163,6 +163,10 @@ EVENT is the process event string."
       (with-current-buffer magit-buf
         (magit-refresh)))))
 
+(defun magit-pre-commit--strip-osc-sequences (string)
+  "Remove OSC escape sequences (like hyperlinks) from STRING."
+  (replace-regexp-in-string "\e\\]8;;[^\e]*\e\\\\" "" string))
+
 (defun magit-pre-commit--filter (process output)
   "Process filter for pre-commit PROCESS.
 OUTPUT is the process output string."
@@ -173,7 +177,7 @@ OUTPUT is the process output string."
               (moving (= (point) (process-mark process))))
           (save-excursion
             (goto-char (process-mark process))
-            (insert (ansi-color-apply output))
+            (insert (ansi-color-apply (magit-pre-commit--strip-osc-sequences output)))
             (set-marker (process-mark process) (point)))
           (when moving
             (goto-char (process-mark process))))))))
@@ -190,7 +194,7 @@ If HOOK is provided, run only that hook."
   (let* ((default-directory (or (magit-pre-commit--project-root)
                                 default-directory))
          (buf (magit-pre-commit--get-buffer))
-         (cmd-args (append (list magit-pre-commit-executable "run")
+         (cmd-args (append (list magit-pre-commit-executable "run" "--color=always")
                            (when hook (list hook))
                            args)))
     ;; Prepare buffer
@@ -230,7 +234,9 @@ If HOOK is provided, run only that hook."
   "Major mode for viewing pre-commit output."
   :group 'magit-pre-commit
   (setq-local truncate-lines t)
-  (setq-local buffer-read-only t))
+  (setq-local buffer-read-only t)
+  (setq-local header-line-format
+              " g:Run staged  G:Run all  k:Kill  q:Close"))
 
 ;;; --- Commands ---
 
@@ -294,11 +300,11 @@ If HOOK is provided, run only that hook."
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
-        (insert "Running: pre-commit autoupdate\n\n")))
+        (insert "Running: pre-commit autoupdate --color=always\n\n")))
     (make-process
      :name "pre-commit-autoupdate"
      :buffer buf
-     :command (list magit-pre-commit-executable "autoupdate")
+     :command (list magit-pre-commit-executable "autoupdate" "--color=always")
      :filter #'magit-pre-commit--filter
      :sentinel (lambda (proc _event)
                  (if (zerop (process-exit-status proc))
@@ -323,17 +329,15 @@ If HOOK is provided, run only that hook."
 ;;;###autoload (autoload 'magit-pre-commit "magit-pre-commit" nil t)
 (transient-define-prefix magit-pre-commit ()
   "Run pre-commit commands."
-  :if #'magit-pre-commit-available-p
-  ["Pre-commit"
-   ("r" "Run (staged)" magit-pre-commit-run)
-   ("a" "Run (all files)" magit-pre-commit-run-all)
-   ("h" "Run hook" magit-pre-commit-run-hook)]
-  ["Setup"
-   ("i" "Install hooks" magit-pre-commit-install)
-   ("u" "Update hooks" magit-pre-commit-autoupdate)]
-  ["Process"
-   ("k" "Kill process" magit-pre-commit-kill
-    :if (lambda () magit-pre-commit--process))])
+  [["Run"
+    ("r" "Staged files" magit-pre-commit-run)
+    ("a" "All files" magit-pre-commit-run-all)
+    ("h" "Specific hook" magit-pre-commit-run-hook)]
+   ["Manage"
+    ("i" "Install hooks" magit-pre-commit-install)
+    ("u" "Update hooks" magit-pre-commit-autoupdate)
+    ("k" "Kill process" magit-pre-commit-kill
+     :if (lambda () magit-pre-commit--process))]])
 
 ;;; --- Magit Status Section ---
 
@@ -359,9 +363,11 @@ If HOOK is provided, run only that hook."
 
 (defun magit-pre-commit--setup ()
   "Set up magit-pre-commit integration."
-  ;; Add to magit-dispatch
-  (transient-insert-suffix 'magit-dispatch "o"
-    '("%" "Pre-commit" magit-pre-commit :if magit-pre-commit-available-p))
+  ;; Add keybinding to magit-mode-map for direct access from status buffer
+  (define-key magit-mode-map "@" #'magit-pre-commit)
+  ;; Add to magit-dispatch for discoverability
+  (transient-insert-suffix 'magit-dispatch "!"
+    '("@" "Pre-commit" magit-pre-commit :if magit-pre-commit-available-p))
   ;; Add status section hook
   (magit-add-section-hook 'magit-status-sections-hook
                           #'magit-pre-commit--status-insert-section
@@ -370,8 +376,10 @@ If HOOK is provided, run only that hook."
 
 (defun magit-pre-commit--teardown ()
   "Remove magit-pre-commit integration."
+  ;; Remove keybinding from magit-mode-map
+  (define-key magit-mode-map "@" nil)
   ;; Remove from magit-dispatch
-  (transient-remove-suffix 'magit-dispatch "%")
+  (transient-remove-suffix 'magit-dispatch "@")
   ;; Remove status section hook
   (remove-hook 'magit-status-sections-hook #'magit-pre-commit--status-insert-section))
 
